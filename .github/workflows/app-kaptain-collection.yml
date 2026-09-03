@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '17 3 * * *' # Staggered cron schedule (runs daily at 03:17 UTC)
   workflow_dispatch:    # Manual trigger option
+    inputs:
+      force_build:
+        description: 'Bypass SHA check and force rebuild'
+        required: false
+        type: boolean
+        default: false
 
 # Grant packages: write permission at the parent workflow level
 permissions:
@@ -17,3 +23,4 @@ jobs:
       upstream_repo: "ImKaptain/Kaptain-Collection"
       dockerfile_path: "dockerfiles/kaptain-collection.Dockerfile"
       image_name: "kaptain-collection"
+      force_build: ${{ inputs.force_build || false }}

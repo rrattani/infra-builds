@@ -15,6 +15,10 @@ on:
         required: true
         type: string
         description: "Package name on GHCR (e.g., kaptain-collection)"
+      force_build:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   check-and-build:
@@ -33,17 +37,22 @@ jobs:
       # Step 2: Check if GHCR already has an image tagged with this commit SHA
       - name: Check GHCR for Tag
         run: |
-          TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer $TOKEN" \
-            "https://ghcr.io/v2/${{ github.repository_owner }}/${{ inputs.image_name }}/manifests/${{ env.UPSTREAM_SHA }}" || echo "404")
-
-          if [ "$STATUS" -eq 200 ]; then
-            echo "SKIP=true" >> $GITHUB_ENV
-            echo "Image for SHA ${{ env.UPSTREAM_SHA }} already exists. Exiting early."
-          else
+          if [ "${{ inputs.force_build }}" = "true" ]; then
             echo "SKIP=false" >> $GITHUB_ENV
-            echo "New commit detected. Proceeding with build."
+            echo "Force build requested. Skipping SHA check."
+          else
+            TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer $TOKEN" \
+              "https://ghcr.io/v2/${{ github.repository_owner }}/${{ inputs.image_name }}/manifests/${{ env.UPSTREAM_SHA }}" || echo "404")
+
+            if [ "$STATUS" -eq 200 ]; then
+              echo "SKIP=true" >> $GITHUB_ENV
+              echo "Image for SHA ${{ env.UPSTREAM_SHA }} already exists. Exiting early."
+            else
+              echo "SKIP=false" >> $GITHUB_ENV
+              echo "New commit detected. Proceeding with build."
+            fi
           fi
 
       # Step 3: Checkout the UPSTREAM application code into ./src
@@ -61,6 +70,16 @@ jobs:
         with:
           path: 'config'
 
+      # Set up QEMU for multi-arch compilation (ARM64 support)
+      - name: Set up QEMU
+        if: env.SKIP != 'true'
+        uses: docker/setup-qemu-action@v3
+
+      # Set up Docker Buildx builder
+      - name: Set up Docker Buildx
+        if: env.SKIP != 'true'
+        uses: docker/setup-buildx-action@v3
+
       # Step 5: Log in to GitHub Container Registry
       - name: Log in to GHCR
         if: env.SKIP != 'true'
@@ -77,6 +96,7 @@ jobs:
         with:
           context: ./src
           file: ./config/${{ inputs.dockerfile_path }}
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:latest

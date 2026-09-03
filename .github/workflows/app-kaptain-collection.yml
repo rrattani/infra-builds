@@ -1,0 +1,14 @@
+name: Build Kaptain Collection
+
+on:
+  schedule:
+    - cron: '17 3 * * *' # Staggered cron schedule (runs daily at 03:17 UTC)
+  workflow_dispatch:    # Manual trigger option
+
+jobs:
+  build:
+    uses: ./.github/workflows/engine-build-and-push.yml
+    with:
+      upstream_repo: "ImKaptain/Kaptain-Collection"
+      dockerfile_path: "dockerfiles/kaptain-collection.Dockerfile"
+      image_name: "kaptain-collection"

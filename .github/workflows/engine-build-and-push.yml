@@ -1,0 +1,83 @@
+name: Shared Container Builder Engine
+
+on:
+  workflow_call:
+    inputs:
+      upstream_repo:
+        required: true
+        type: string
+        description: "Target upstream repository (e.g., ImKaptain/Kaptain-Collection)"
+      dockerfile_path:
+        required: true
+        type: string
+        description: "Path to Dockerfile inside this repo (e.g., dockerfiles/kaptain-collection.Dockerfile)"
+      image_name:
+        required: true
+        type: string
+        description: "Package name on GHCR (e.g., kaptain-collection)"
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write # Required to push to GHCR
+
+    steps:
+      # Step 1: Fetch the latest Git commit SHA from the external repository
+      - name: Fetch Upstream Commit SHA
+        run: |
+          UPSTREAM_SHA=$(git ls-remote https://github.com/${{ inputs.upstream_repo }}.git HEAD | awk '{print $1}')
+          echo "UPSTREAM_SHA=$UPSTREAM_SHA" >> $GITHUB_ENV
+          echo "Upstream SHA: $UPSTREAM_SHA"
+
+      # Step 2: Check if GHCR already has an image tagged with this commit SHA
+      - name: Check GHCR for Tag
+        run: |
+          TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://ghcr.io/v2/${{ github.repository_owner }}/${{ inputs.image_name }}/manifests/${{ env.UPSTREAM_SHA }}" || echo "404")
+
+          if [ "$STATUS" -eq 200 ]; then
+            echo "SKIP=true" >> $GITHUB_ENV
+            echo "Image for SHA ${{ env.UPSTREAM_SHA }} already exists. Exiting early."
+          else
+            echo "SKIP=false" >> $GITHUB_ENV
+            echo "New commit detected. Proceeding with build."
+          fi
+
+      # Step 3: Checkout the UPSTREAM application code into ./src
+      - name: Checkout Upstream App Code
+        if: env.SKIP != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.upstream_repo }}
+          path: 'src'
+
+      # Step 4: Checkout THIS repo into ./config to access the custom Dockerfile
+      - name: Checkout Dockerfile Config
+        if: env.SKIP != 'true'
+        uses: actions/checkout@v4
+        with:
+          path: 'config'
+
+      # Step 5: Log in to GitHub Container Registry
+      - name: Log in to GHCR
+        if: env.SKIP != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 6: Build and Push image tagged with both :latest and :<GIT_SHA>
+      - name: Build and Push Image
+        if: env.SKIP != 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src
+          file: ./config/${{ inputs.dockerfile_path }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:latest
+            ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:${{ env.UPSTREAM_SHA }}

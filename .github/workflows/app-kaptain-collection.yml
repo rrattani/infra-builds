@@ -5,6 +5,11 @@ on:
     - cron: '17 3 * * *' # Staggered cron schedule (runs daily at 03:17 UTC)
   workflow_dispatch:    # Manual trigger option
 
+# Grant packages: write permission at the parent workflow level
+permissions:
+  packages: write
+  contents: read
+
 jobs:
   build:
     uses: ./.github/workflows/engine-build-and-push.yml

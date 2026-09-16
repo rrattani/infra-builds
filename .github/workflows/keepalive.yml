@@ -3,6 +3,7 @@ name: Keepalive Workflow
 on:
   schedule:
     - cron: "23 4 * * 3" # Runs every Wednesday at 04:23 UTC
+  workflow_dispatch:
 
 permissions:
   actions: write

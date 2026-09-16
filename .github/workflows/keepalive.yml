@@ -14,7 +14,10 @@ jobs:
     name: Keepalive All Workflows
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          time_elapsed: "0"
+      - name: Prevent Workflow Inactivity Disabling
+        run: |
+          echo "Pinging GitHub API to keep repository workflows active..."
+          curl -s -X GET \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows" > /dev/null

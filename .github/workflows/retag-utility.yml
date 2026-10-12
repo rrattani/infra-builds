@@ -1,0 +1,44 @@
+name: Generic Docker Retag Utility
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: 'The package directory/repo name (e.g., my-awesome-app)'
+        required: true
+        type: string
+      target_tag:
+        description: 'The older version tag to promote to latest (e.g., v1.2.0)'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set Image Environment Variable
+        # Constructing: ghcr.io/your-username/input-package-name
+        run: echo "FULL_IMAGE_NAME=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.package_name }}" >> $GITHUB_ENV
+
+      - name: Pull the older image
+        run: docker pull ${{ env.FULL_IMAGE_NAME }}:${{ inputs.target_tag }}
+
+      - name: Apply the latest tag locally
+        run: docker tag ${{ env.FULL_IMAGE_NAME }}:${{ inputs.target_tag }} ${{ env.FULL_IMAGE_NAME }}:latest
+
+      - name: Push the updated latest tag
+        run: docker push ${{ env.FULL_IMAGE_NAME }}:latest

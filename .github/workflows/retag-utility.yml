@@ -25,7 +25,7 @@ jobs:
       # 1. Download official regctl binary directly (no third-party actions needed)
       - name: Install regctl CLI
         run: |
-          curl -L https://github.com > /usr/local/bin/regctl
+          curl -L https://github.com -o /usr/local/bin/regctl
           chmod +x /usr/local/bin/regctl
 
       # 2. Log in directly to GHCR using regctl

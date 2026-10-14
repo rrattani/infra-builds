@@ -22,30 +22,24 @@ jobs:
       packages: write
 
     steps:
-      # 1. Download official regctl binary directly (no third-party actions needed)
-      - name: Install regctl CLI
-        run: |
-          mkdir -p $HOME/.local/bin
-          curl -L "https://github.com" -o $HOME/.local/bin/regctl
-          chmod +x $HOME/.local/bin/regctl
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Log in directly to GHCR using regctl
-      - name: Log in to GitHub Container Registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | regctl registry login ${{ env.REGISTRY }} --username ${{ github.actor }} --pass-stdin
-
-      # 3. Construct the image path
       - name: Set Image Environment Variable
         run: echo "FULL_IMAGE_NAME=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.package_name }}" >> $GITHUB_ENV
 
-      # 4. Copy the tag directly in the registry (Preserves all platforms/architectures!)
-      - name: Copy target tag to latest
+      - name: Copy multi-arch manifest directly in the cloud
         run: |
-          regctl image copy ${{ env.FULL_IMAGE_NAME }}:${{ inputs.target_tag }} ${{ env.FULL_IMAGE_NAME }}:latest
-
-      # 5. Quick Verification: Log the architectures to prove it worked
-      - name: Verify multi-arch platforms are preserved
-        run: |
-          echo "=== Manifest data for new latest tag ==="
-          regctl manifest inspect ${{ env.FULL_IMAGE_NAME }}:latest
+          # 1. Download the older version's structural blueprint manifest list
+          docker manifest inspect ${{ env.FULL_IMAGE_NAME }}:${{ inputs.target_tag }} > manifest.json
+          
+          # 2. Re-create a clean manifest list mapping to 'latest' using the same blueprints
+          docker manifest create ${{ env.FULL_IMAGE_NAME }}:latest \
+            $(jq -r '.manifests[].digest' manifest.json | sed "s|^|${{ env.FULL_IMAGE_NAME }}@|")
+            
+          # 3. Push the finalized latest manifest to GHCR without downloading layers
+          docker manifest push ${{ env.FULL_IMAGE_NAME }}:latest

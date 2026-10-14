@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       package_name:
-        description: 'The package directory/repo name (e.g., my-awesome-app)'
+        description: 'The package directory/repo name (e.g., kaptain-collection)'
         required: true
         type: string
       target_tag:
-        description: 'The older version tag or SHA to promote to latest'
+        description: 'The older version tag or SHA to promote to latest (e.g., 4c1ebb5bb4f0ffd06f72c79aa7d2644aa059e38f)'
         required: true
         type: string
 
@@ -20,26 +20,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write
+      contents: read
 
     steps:
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
+      # This step uses the GitHub registry API directly to duplicate the target manifest pointer.
+      # It natively keeps your multi-arch architectures and exact SHA signatures completely intact.
+      - name: Retag Multi-Arch Image via Registry API
+        uses: shrink/actions-docker-registry-tag@v4
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set Image Environment Variable
-        run: echo "FULL_IMAGE_NAME=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.package_name }}" >> $GITHUB_ENV
-
-      - name: Copy multi-arch manifest directly in the cloud
-        run: |
-          # 1. Download the older version's structural blueprint manifest list
-          docker manifest inspect ${{ env.FULL_IMAGE_NAME }}:${{ inputs.target_tag }} > manifest.json
-          
-          # 2. Re-create a clean manifest list mapping to 'latest' using the same blueprints
-          docker manifest create ${{ env.FULL_IMAGE_NAME }}:latest \
-            $(jq -r '.manifests[].digest' manifest.json | sed "s|^|${{ env.FULL_IMAGE_NAME }}@|")
-            
-          # 3. Push the finalized latest manifest to GHCR without downloading layers
-          docker manifest push ${{ env.FULL_IMAGE_NAME }}:latest
+          repository: ${{ github.repository_owner }}/${{ inputs.package_name }}
+          target: ${{ inputs.target_tag }}
+          tags: latest

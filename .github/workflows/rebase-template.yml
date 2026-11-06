@@ -1,0 +1,66 @@
+name: Generic Rebase Template
+
+on:
+  # 1. Allows this to be called by your child workflows
+  workflow_call:
+    inputs:
+      fork_repo:
+        required: true
+        type: string
+      fork_branch:
+        required: true
+        type: string
+      upstream_repo:
+        required: true
+        type: string
+      upstream_branch:
+        required: true
+        type: string
+    secrets:
+      REBASE_TOKEN:
+        required: true
+
+  # 2. Allows you to run this manually from the Actions tab with a button
+  workflow_dispatch:
+    inputs:
+      fork_repo:
+        description: 'Your fork (e.g., rrattani/my-fork)'
+        required: true
+        type: string
+      fork_branch:
+        description: 'Branch in your fork (e.g., main)'
+        required: true
+        type: string
+      upstream_repo:
+        description: 'Upstream repository (e.g., original-org/original-repo)'
+        required: true
+        type: string
+      upstream_branch:
+        description: 'Branch in upstream repo (e.g., main)'
+        required: true
+        type: string
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target fork
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.fork_repo }}
+          token: ${{ secrets.SYNC_PAT }}
+          ref: ${{ inputs.fork_branch }}
+          fetch-depth: 0
+
+      - name: Configure Git bot
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch, Rebase, and Push
+        run: |
+          git remote add upstream https://github.com/${{ inputs.upstream_repo }}.git
+          git fetch upstream ${{ inputs.upstream_branch }}
+          git checkout ${{ inputs.fork_branch }}
+          git rebase upstream/${{ inputs.upstream_branch }}
+          git push origin ${{ inputs.fork_branch }} --force-with-lease

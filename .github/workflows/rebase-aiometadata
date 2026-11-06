@@ -1,0 +1,24 @@
+name: Rebase AIO-Metadata
+
+on:
+  schedule:
+    # Runs at 2:27 AM UTC to avoid top-of-the-hour runner queue delays
+    - cron: '27 2 * * *' 
+  
+  # Adds the "Run workflow" button in the Actions tab for manual triggers
+  workflow_dispatch: 
+
+jobs:
+  call-rebase-template:
+    # Points to the generic template stored in the exact same repository
+    uses: ./.github/workflows/rebase-template.yml
+    
+    # Passes the specific strings needed for this fork
+    with:
+      fork_repo: "rrattani/aiometadata"
+      fork_branch: "dev"
+      upstream_repo: "cedya77/aiometadata"
+      upstream_branch: "dev"
+      
+    # Safely passes the REBASE_TOKEN (and any other repository secrets) to the template
+    secrets: inherit

@@ -1,0 +1,26 @@
+name: Build Nuvio Web
+
+on:
+  schedule:
+    - cron: '17 4 * * *' # Staggered cron schedule (runs daily at 04:17 UTC)
+  workflow_dispatch:    # Manual trigger option
+    inputs:
+      force_build:
+        description: 'Bypass SHA check and force rebuild'
+        required: false
+        type: boolean
+        default: false
+
+# Grant packages: write permission at the parent workflow level
+permissions:
+  packages: write
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/docker-build-and-push-template.yml
+    with:
+      upstream_repo: "lucaboox/nuvio-web"
+      dockerfile_path: "dockerfiles/nuvio-web.Dockerfile"
+      image_name: "nuvio-web"
+      force_build: ${{ inputs.force_build || false }}

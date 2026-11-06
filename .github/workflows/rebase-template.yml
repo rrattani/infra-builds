@@ -48,7 +48,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.fork_repo }}
-          token: ${{ secrets.SYNC_PAT }}
+          token: ${{ secrets.REBASE_TOKEN }}
           ref: ${{ inputs.fork_branch }}
           fetch-depth: 0
 
